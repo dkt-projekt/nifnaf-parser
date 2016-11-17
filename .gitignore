@@ -1,0 +1,6 @@
+*.jpage
+target/
+
+.classpath
+.project
+.settings
