@@ -11,11 +11,11 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 import org.apache.log4j.Logger;
 
 import com.hp.hpl.jena.rdf.model.Model;
-import com.hp.hpl.jena.rdf.model.ResIterator;
 
 import de.dkt.common.niftools.NIF;
 import de.dkt.common.niftools.NIFReader;
@@ -52,12 +52,60 @@ public class Nif2NafConverter {
 		this.targetNafDoc.setRawText(this.textContent);
 
 		extractEntities();
+		extractTemporalEntities();
 
 		String naf = this.targetNafDoc.toString();
 		return naf;
 	}
 
 
+	private void extractTemporalEntities(){
+		String NIF = "http://persistence.uni-leipzig.org/nlp2rdf/ontologies/nif-core#";
+		
+		Map<String, Map<String,String>> tempEntities = NIFReader.extractTemporalEntitiesExtended(this.srcNifDoc);
+//		List<String[]> tempExpressions = NIFReader.extractTemporalExpressions(this.srcNifDoc);
+		
+		Set<String> keys = tempEntities.keySet();
+		for(String key:keys){
+			Map<String, String> entityPredObjMap = tempEntities.get(key);
+			
+			String offset = entityPredObjMap.get(NIF+"beginIndex");
+			String temporalEntity = entityPredObjMap.get(NIF+"anchorOf");
+			
+			List<String> tokenizedWords = new ArrayList<String>();
+			List<Integer> beginIndices = this.getTokenizedString(temporalEntity, tokenizedWords);
+		
+			List<String> wordIds = new ArrayList<String>();
+			int w = 0;
+			for(String word : tokenizedWords){
+				
+				int offsetInt = Integer.parseInt(offset);
+				int nb = offsetInt + beginIndices.get(w);
+				wordIds.add(this.wordToIdMap.get(word+String.valueOf(nb)));
+				w++;
+			}
+			
+			// add new Entity
+			List<Term> terms = this.targetNafDoc.getTermsFromWFs(wordIds);
+			Span<Term> termSpan = KAFDocument.newTermSpan(terms);
+			List<Span<Term>> targets = new ArrayList<Span<Term>>();
+			targets.add(termSpan);
+			this.targetNafDoc.newEntity("Time", targets);  
+
+			//add temporal Expression
+			List<WF> allWFs = this.targetNafDoc.getWFs();
+			List<WF> targetWFs = new ArrayList<WF>();
+			for(WF wf:allWFs){
+				String currentId = wf.getId();
+				if(wordIds.contains(currentId)){
+					targetWFs.add(wf);
+				}
+			}
+			Span<WF> wfSpan = KAFDocument.newWFSpan(targetWFs);
+			this.targetNafDoc.newTimex3("Time").setSpan(wfSpan);;
+		}
+	}
+	
 	private void extractEntities(){
 		
 		//TODO extract all taClassRefs! 
@@ -70,30 +118,19 @@ public class Nif2NafConverter {
 			String namedEntity = entity[1]; 
 			String beginIdx = entity[3];
 			
-			//TODO adapt locale
-			BreakIterator wordTokenizer = BreakIterator.getWordInstance(Locale.ENGLISH);
-			wordTokenizer.setText(namedEntity);
-			int start = wordTokenizer.first();
-			
 			List<String> wfids = new ArrayList<String>();
+			List<String> tokenizedWords = new ArrayList<String>();
+
+			this.getTokenizedString(namedEntity, tokenizedWords);
 			
-			//retrieve first part of named entity for which we know beginIdx
-			int end = wordTokenizer.next();
-			String firstPartNamedEntity = namedEntity.substring(start,end);
-			String firstPartId = this.wordToIdMap.get(firstPartNamedEntity+beginIdx);
-			wfids.add(firstPartId);
-			start = end;
-			// named entity consists of consecutive words
-			int startId = Integer.parseInt(firstPartId.substring(1))+1;
-			
-			for (end = wordTokenizer.next(); end != BreakIterator.DONE; start = end, end = wordTokenizer.next()) {
-				String partOfNamedEntity = namedEntity.substring(start,end);
-				if(partOfNamedEntity.matches("\\s+")){ 
-					continue;
-				}
+			String firstPartId = this.wordToIdMap.get(tokenizedWords.get(0)+beginIdx);
+			int startId = Integer.parseInt(firstPartId.substring(1));
+
+			for(String word:tokenizedWords){
 				wfids.add("w" + String.valueOf(startId));
 				startId++;
 			}
+
 			List<Term> terms = this.targetNafDoc.getTermsFromWFs(wfids);
 			Span<Term> termSpan = KAFDocument.newTermSpan(terms);
 
@@ -101,7 +138,7 @@ public class Nif2NafConverter {
 			references.add(termSpan);
 			
 			
-			//taClassRef: wird immer nur das erste extracted?
+			//TODO taClassRef: wird immer nur das erste extracted?
 			String type;
 			if(entity[2].toLowerCase().contains("Person") || entity[2].toLowerCase().contains("Time") || entity[2].toLowerCase().contains("Location") 
 					|| entity[2].toLowerCase().contains("Organization")|| entity[2].toLowerCase().contains("Money")
@@ -147,13 +184,12 @@ public class Nif2NafConverter {
 			sent++;
 			// word-level
 			String currentSent = this.textContent.substring(start,end);
-			wordTokenizer.setText(currentSent);
-			int wordStart = wordTokenizer.first();
-			for(int wordEnd = wordTokenizer.next(); wordEnd != BreakIterator.DONE; wordStart = wordEnd, wordEnd = wordTokenizer.next()){
-				String currentWord = currentSent.substring(wordStart, wordEnd);
-				if(!currentWord.matches("\\s+")){
-					this.targetNafDoc.newWF(wordStart+start, currentWord, sent);
-				}
+			List<String> tokenizedWords = new ArrayList<String>();
+			List<Integer> startIndices = this.getTokenizedString(currentSent, tokenizedWords);
+			int w=0;
+			for(String word:tokenizedWords){
+				this.targetNafDoc.newWF(start + startIndices.get(w),word,sent);
+				w++;
 			}
 		}
 		// save all words with their id in map
@@ -175,6 +211,26 @@ public class Nif2NafConverter {
 	}
 
 	
-
+	
+	private List<Integer> getTokenizedString(String stringOfWords, List<String> tokenizedWords){
+		//TODO adapt language
+		BreakIterator wordTokenizer = BreakIterator.getWordInstance(Locale.ENGLISH);
+		wordTokenizer.setText(stringOfWords);
+		int start = wordTokenizer.first();
+		List<Integer> startIndices = new ArrayList<Integer>();
+		
+		for (int end = wordTokenizer.next(); end != BreakIterator.DONE; start = end, end = wordTokenizer.next()) {
+			String partOfNamedEntity = stringOfWords.substring(start,end);
+			if(partOfNamedEntity.matches("\\s+")){
+				continue;
+			}
+			tokenizedWords.add(partOfNamedEntity);
+			startIndices.add(start);
+		}
+		return startIndices;
+	}
+	
+	
+	
 
 }

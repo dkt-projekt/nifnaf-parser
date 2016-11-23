@@ -39,6 +39,7 @@ public class Naf2NifConverter  {
 	
 	public Model convert(){	
 		
+		//TODO: what if NAF-Document doesn't have a document uri ? 
 		String text = extractSrcText();
 		String uri = extractDocUri();
 		NIFWriter.addInitialString(this.outputModel, text, uri);
@@ -55,7 +56,11 @@ public class Naf2NifConverter  {
 	
 	private String extractDocUri(){
 		Public p = this.nafdoc.getPublic();
-		return p.uri;
+		String uri = null;
+		if (p!=null){
+			uri = p.uri;
+		}
+		return uri;
 	}
 	
 	
