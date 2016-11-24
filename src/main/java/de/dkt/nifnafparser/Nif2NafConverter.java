@@ -116,8 +116,14 @@ public class Nif2NafConverter {
 				// TODO for now always duration 
 				Timex3 newTimeExpr = this.targetNafDoc.newTimex3("DURATION");
 				newTimeExpr.setSpan(wfSpan);
-				newTimeExpr.setBeginPoint(newTimeExpr);
-				newTimeExpr.setEndPoint(newTimeExpr);
+				
+				Timex3 beginTimeExpr = this.targetNafDoc.newTimex3("TIME");
+				beginTimeExpr.setValue(begin);
+				Timex3 endTimeExpr = this.targetNafDoc.newTimex3("TIME");
+				endTimeExpr.setValue(end);
+
+				newTimeExpr.setBeginPoint(beginTimeExpr);
+				newTimeExpr.setEndPoint(endTimeExpr);
 				
 				
 			}

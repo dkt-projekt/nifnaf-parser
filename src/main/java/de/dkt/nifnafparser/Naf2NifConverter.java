@@ -117,10 +117,19 @@ public class Naf2NifConverter  {
 		
 		List<Timex3> timeExpressions = this.nafdoc.getTimeExs();
 		for(Timex3 timeExpr : timeExpressions){
-			//			String anchor = timeExpr.getAnchorTimeId();
-			//			Timex3 begin = timeExpr.getBeginPoint();
-			//			Timex3 ende = timeExpr.getEndPoint();
-			//			String val = timeExpr.getValue();
+
+			Timex3 begTimeExpr = timeExpr.getBeginPoint();
+			Timex3 endTimeExpr = timeExpr.getEndPoint();
+			String timeExprBegin = "";
+			String timeExprEnd = "";
+			if(begTimeExpr!=null && endTimeExpr != null){
+				timeExprBegin = begTimeExpr.getValue();
+				timeExprEnd = endTimeExpr.getValue();
+			}else{
+				// Temporal Entities need to have intervalStart and intervalFinishes in NIF
+				continue;
+			}
+
 			Span<WF> span = timeExpr.getSpan();
 			StringBuilder builder = new StringBuilder();
 			int w=0;
@@ -137,8 +146,9 @@ public class Naf2NifConverter  {
 			WF lastWord = allWFs.get(allWFs.size()-1);
 			int end = lastWord.getOffset() + lastWord.getLength();
 
+			
 			//TODO intervalStart + intervalEnds need to be inserted to NAF!
-			String label = "2016-10-24T00:00:00_2016-10-24T00:00:00";
+			String label = timeExprBegin + "_" + timeExprEnd;
 			NIFWriter.addTemporalEntity(this.outputModel, offset, end, temporalExpr, label);
 		}
 
