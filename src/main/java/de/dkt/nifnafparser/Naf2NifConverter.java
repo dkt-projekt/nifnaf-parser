@@ -35,6 +35,7 @@ public class Naf2NifConverter  {
 		this.nafdoc = KAFDocument.createFromStream(new StringReader(nafContent));
 		//represent the NIF target doc
 		this.outputModel = NIFWriter.initializeOutputModel();
+		NIFWriter.addPrefixToModel(this.outputModel, "time", "http://www.w3.org/2006/time#");
 	}
 
 
@@ -113,6 +114,7 @@ public class Naf2NifConverter  {
 	}
 
 	private void extractTemporalExpressions(){
+		
 		List<Timex3> timeExpressions = this.nafdoc.getTimeExs();
 		for(Timex3 timeExpr : timeExpressions){
 			//			String anchor = timeExpr.getAnchorTimeId();
