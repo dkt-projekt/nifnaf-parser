@@ -21,7 +21,9 @@ The NIF-NAF Parser takes a NIF (NAF) document as input and converts it to NAF (N
 ## Parameters
 *Optional*: 
 naf-version: defaults to v3
+
 nif-version: defaults to 2.0
+
 lang: defaults to english ('en') Other languages are not supported for now.
 
 *Required*
